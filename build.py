@@ -83,10 +83,133 @@ def build_exe():
         
         # 优化
         '--optimize=2',                          # Python优化级别
+        
+        # 排除不需要的 Qt 模块（减小体积）
+        '--exclude-module=PyQt6.QtNetwork',
+        '--exclude-module=PyQt6.QtPdf',
+        '--exclude-module=PyQt6.QtSvg',
+        '--exclude-module=PyQt6.QtQml',
+        '--exclude-module=PyQt6.QtQuick',
+        '--exclude-module=PyQt6.QtWebEngine',
+        '--exclude-module=PyQt6.QtMultimedia',
+        '--exclude-module=PyQt6.QtBluetooth',
+        '--exclude-module=PyQt6.QtPositioning',
+        '--exclude-module=PyQt6.QtSensors',
+        '--exclude-module=PyQt6.QtSerialPort',
+        '--exclude-module=PyQt6.QtSql',
+        '--exclude-module=PyQt6.QtTest',
+        '--exclude-module=PyQt6.QtXml',
     ]
     
     # 运行 PyInstaller
     subprocess.check_call([sys.executable, '-m', 'PyInstaller'] + pyinstaller_args)
+
+
+def slim_output(output_dir: Path):
+    """删除不必要的文件以减小体积"""
+    print("\n精简输出目录...")
+    
+    removed_size = 0
+    internal_dir = output_dir / '_internal'
+    qt_dir = internal_dir / 'PyQt6' / 'Qt6'
+    qt_bin = qt_dir / 'bin'
+    qt_plugins = qt_dir / 'plugins'
+    
+    # === 删除大型不必要的 DLL ===
+    
+    # opengl32sw.dll - 软件 OpenGL 渲染，现代电脑都有硬件加速 (~20MB)
+    opengl_sw = qt_bin / 'opengl32sw.dll'
+    if opengl_sw.exists():
+        removed_size += opengl_sw.stat().st_size
+        opengl_sw.unlink()
+        print(f"  已删除: opengl32sw.dll (软件渲染)")
+    
+    # libcrypto - SSL/加密库，不需要网络功能 (~7MB)
+    for f in internal_dir.glob('libcrypto*.dll'):
+        removed_size += f.stat().st_size
+        f.unlink()
+        print(f"  已删除: {f.name} (加密库)")
+    
+    # libssl - 同上
+    for f in internal_dir.glob('libssl*.dll'):
+        removed_size += f.stat().st_size
+        f.unlink()
+        print(f"  已删除: {f.name} (SSL库)")
+    
+    # unicodedata.pyd - Unicode 数据库，一般不需要 (~1MB)
+    unicodedata = internal_dir / 'unicodedata.pyd'
+    if unicodedata.exists():
+        removed_size += unicodedata.stat().st_size
+        unicodedata.unlink()
+        print(f"  已删除: unicodedata.pyd")
+    
+    # === 删除 Qt 相关不必要文件 ===
+    
+    # Qt 翻译文件（不需要多语言）
+    translations_dir = qt_dir / 'translations'
+    if translations_dir.exists():
+        for f in translations_dir.iterdir():
+            removed_size += f.stat().st_size
+        shutil.rmtree(translations_dir)
+        print(f"  已删除: Qt 翻译文件")
+    
+    # 不需要的 Qt DLL
+    for dll_name in ['Qt6Pdf.dll', 'Qt6Network.dll', 'Qt6Svg.dll']:
+        dll_path = qt_bin / dll_name
+        if dll_path.exists():
+            removed_size += dll_path.stat().st_size
+            dll_path.unlink()
+            print(f"  已删除: {dll_name}")
+    
+    # === 删除不需要的平台插件 ===
+    
+    platforms_dir = qt_plugins / 'platforms'
+    if platforms_dir.exists():
+        # 只保留 qwindows.dll，删除其他平台
+        for f in platforms_dir.iterdir():
+            if f.name not in {'qwindows.dll'}:
+                removed_size += f.stat().st_size
+                f.unlink()
+                print(f"  已删除: platforms/{f.name}")
+    
+    # === 删除不需要的图像格式插件 ===
+    
+    imageformats_dir = qt_plugins / 'imageformats'
+    if imageformats_dir.exists():
+        keep_formats = {'qjpeg.dll', 'qico.dll', 'qgif.dll', 'qsvg.dll'}
+        for f in imageformats_dir.iterdir():
+            if f.name not in keep_formats:
+                removed_size += f.stat().st_size
+                f.unlink()
+                print(f"  已删除: imageformats/{f.name}")
+    
+    # === 删除不需要的插件目录 ===
+    
+    # generic 插件（触摸屏相关）
+    generic_dir = qt_plugins / 'generic'
+    if generic_dir.exists():
+        for f in generic_dir.iterdir():
+            removed_size += f.stat().st_size
+        shutil.rmtree(generic_dir)
+        print(f"  已删除: generic 插件目录")
+    
+    # iconengines 插件（SVG 图标引擎）
+    iconengines_dir = qt_plugins / 'iconengines'
+    if iconengines_dir.exists():
+        for f in iconengines_dir.iterdir():
+            removed_size += f.stat().st_size
+        shutil.rmtree(iconengines_dir)
+        print(f"  已删除: iconengines 插件目录")
+    
+    # styles 插件（如果不需要 modern windows style）
+    # styles_dir = qt_plugins / 'styles'
+    # if styles_dir.exists():
+    #     for f in styles_dir.iterdir():
+    #         removed_size += f.stat().st_size
+    #     shutil.rmtree(styles_dir)
+    #     print(f"  已删除: styles 插件目录")
+    
+    print(f"\n  共减少约 {removed_size / 1024 / 1024:.1f} MB")
 
 
 def create_output():
@@ -135,8 +258,11 @@ def create_output():
     if logo_src.exists():
         shutil.copy2(logo_src, logo_dst)
     
-    print(f"\n✅ 打包完成！输出目录: {output_dir.absolute()}")
-    print("\n📁 目录结构:")
+    # 精简输出
+    slim_output(output_dir)
+    
+    print(f"\n打包完成！输出目录: {output_dir.absolute()}")
+    print("\n目录结构:")
     print_tree(output_dir)
 
 
@@ -190,10 +316,10 @@ def main():
         print("      预设文件保存在 presets 目录中")
         
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ 构建失败: {e}")
+        print(f"\n构建失败: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ 发生错误: {e}")
+        print(f"\n发生错误: {e}")
         sys.exit(1)
 
 
