@@ -64,10 +64,10 @@ def build_exe():
         '--clean',                               # 清理临时文件
         '--icon=images/logo.png',               # 应用图标
         
-        # 添加数据文件
-        '--add-data=src/config;config',          # 配置目录
-        '--add-data=src/presets;presets',        # 预设目录
-        '--add-data=images/logo.png;images',     # logo图片
+        # 添加数据文件（注意：不要打包 ai_config.yaml，里面有密钥）
+        '--add-data=src/config/options.yaml;config',  # 只打包 options.yaml
+        '--add-data=src/presets;presets',             # 预设目录
+        '--add-data=images/logo.png;images',          # logo图片
         
         # 隐藏导入（确保所有模块都被包含）
         '--hidden-import=PyQt6.QtWidgets',
@@ -75,17 +75,80 @@ def build_exe():
         '--hidden-import=PyQt6.QtGui',
         '--hidden-import=yaml',
         '--hidden-import=pyperclip',
+        '--hidden-import=openai',                     # AI 服务
+        '--hidden-import=openai.resources',
+        '--hidden-import=openai.resources.chat',
+        '--hidden-import=openai.resources.chat.completions',
+        '--hidden-import=openai._streaming',
+        '--hidden-import=httpx',
+        '--hidden-import=httpcore',
+        '--hidden-import=h11',
+        '--hidden-import=anyio',
+        '--hidden-import=sniffio',
+        '--hidden-import=certifi',
+        '--hidden-import=pydantic',
+        '--hidden-import=pydantic_core',
+        '--hidden-import=jiter',
+        '--hidden-import=jaraco.text',                # pkg_resources 依赖
+        '--hidden-import=jaraco.functools',
+        '--hidden-import=jaraco.context',
+        '--collect-all=jaraco',
+        '--collect-all=jaraco.text',
+        '--collect-all=jaraco.functools',
+        '--collect-all=jaraco.context',
+        '--collect-all=more_itertools',
+        '--collect-all=backports',
+        '--collect-all=backports.tarfile',
+        
+        # 收集整个 openai 包及其关键依赖
+        '--collect-all=openai',
+        '--collect-all=httpx',
+        '--collect-all=httpcore',
+        '--collect-all=pydantic',
+        '--collect-all=pydantic_core',
+        '--collect-all=jiter',
+        '--collect-all=anyio',
+        '--collect-all=sniffio',
+        '--collect-all=certifi',
+        '--collect-all=h11',
+        '--collect-all=typing_extensions',
+        '--collect-all=distro',
+        # 排除 http2 相关（避免 cffi/pycparser 问题）
+        '--exclude-module=h2',
+        '--exclude-module=hpack',
+        '--exclude-module=hyperframe',
+        '--exclude-module=cffi',
+        '--exclude-module=pycparser',
         
         # 排除冲突的 Qt 绑定
         '--exclude-module=PyQt5',
         '--exclude-module=PySide6',
         '--exclude-module=PySide2',
         
+        # 排除不需要的大型库（可能被环境中其他包间接引入）
+        '--exclude-module=numpy',
+        '--exclude-module=pandas',
+        '--exclude-module=matplotlib',
+        '--exclude-module=scipy',
+        '--exclude-module=torch',
+        '--exclude-module=tensorflow',
+        '--exclude-module=PIL',
+        '--exclude-module=cv2',
+        '--exclude-module=sklearn',
+        '--exclude-module=IPython',
+        '--exclude-module=jupyter',
+        '--exclude-module=notebook',
+        '--exclude-module=pytest',
+        # '--exclude-module=setuptools',  # pkg_resources 需要，不能排除
+        '--exclude-module=pip',
+        '--exclude-module=sounddevice',
+        '--exclude-module=soundfile',
+        
         # 优化
         '--optimize=2',                          # Python优化级别
         
         # 排除不需要的 Qt 模块（减小体积）
-        '--exclude-module=PyQt6.QtNetwork',
+        # '--exclude-module=PyQt6.QtNetwork',  # AI功能可能需要网络模块
         '--exclude-module=PyQt6.QtPdf',
         '--exclude-module=PyQt6.QtSvg',
         '--exclude-module=PyQt6.QtQml',
@@ -124,24 +187,22 @@ def slim_output(output_dir: Path):
         opengl_sw.unlink()
         print(f"  已删除: opengl32sw.dll (软件渲染)")
     
-    # libcrypto - SSL/加密库，不需要网络功能 (~7MB)
-    for f in internal_dir.glob('libcrypto*.dll'):
-        removed_size += f.stat().st_size
-        f.unlink()
-        print(f"  已删除: {f.name} (加密库)")
+    # libcrypto / libssl - AI功能需要HTTPS，保留这些库
+    # for f in internal_dir.glob('libcrypto*.dll'):
+    #     removed_size += f.stat().st_size
+    #     f.unlink()
+    #     print(f"  已删除: {f.name} (加密库)")
+    # for f in internal_dir.glob('libssl*.dll'):
+    #     removed_size += f.stat().st_size
+    #     f.unlink()
+    #     print(f"  已删除: {f.name} (SSL库)")
     
-    # libssl - 同上
-    for f in internal_dir.glob('libssl*.dll'):
-        removed_size += f.stat().st_size
-        f.unlink()
-        print(f"  已删除: {f.name} (SSL库)")
-    
-    # unicodedata.pyd - Unicode 数据库，一般不需要 (~1MB)
-    unicodedata = internal_dir / 'unicodedata.pyd'
-    if unicodedata.exists():
-        removed_size += unicodedata.stat().st_size
-        unicodedata.unlink()
-        print(f"  已删除: unicodedata.pyd")
+    # unicodedata.pyd - Unicode 数据库，openai/pydantic 需要，保留
+    # unicodedata = internal_dir / 'unicodedata.pyd'
+    # if unicodedata.exists():
+    #     removed_size += unicodedata.stat().st_size
+    #     unicodedata.unlink()
+    #     print(f"  已删除: unicodedata.pyd")
     
     # === 删除 Qt 相关不必要文件 ===
     
@@ -153,8 +214,8 @@ def slim_output(output_dir: Path):
         shutil.rmtree(translations_dir)
         print(f"  已删除: Qt 翻译文件")
     
-    # 不需要的 Qt DLL
-    for dll_name in ['Qt6Pdf.dll', 'Qt6Network.dll', 'Qt6Svg.dll']:
+    # 不需要的 Qt DLL（保留 Qt6Network.dll，AI功能需要）
+    for dll_name in ['Qt6Pdf.dll', 'Qt6Svg.dll']:
         dll_path = qt_bin / dll_name
         if dll_path.exists():
             removed_size += dll_path.stat().st_size
@@ -209,7 +270,7 @@ def slim_output(output_dir: Path):
     #     shutil.rmtree(styles_dir)
     #     print(f"  已删除: styles 插件目录")
     
-    print(f"\n  共减少约 {removed_size / 1024 / 1024:.1f} MB")
+
 
 
 def create_output():
@@ -309,12 +370,7 @@ def main():
         print("\n" + "=" * 50)
         print("🎉 打包成功！")
         print("=" * 50)
-        print("\n使用说明:")
-        print("1. 将 output 文件夹压缩为 zip")
-        print(f"2. 发送给用户解压后运行 {APP_NAME}.exe")
-        print("\n注意: 用户可以在 config/options.yaml 中自定义选项")
-        print("      预设文件保存在 presets 目录中")
-        
+    
     except subprocess.CalledProcessError as e:
         print(f"\n构建失败: {e}")
         sys.exit(1)

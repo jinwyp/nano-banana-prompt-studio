@@ -668,4 +668,29 @@ QFrame {{
 #aspectFieldCombo:focus {{
     border-color: {ACCENT};
 }}
+
+/* ========================================
+   AI生成按钮 - 特殊强调样式
+   ======================================== */
+
+#aiGenerateButton {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #8B5CF6, stop:1 #A855F7);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+}}
+
+#aiGenerateButton:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #7C3AED, stop:1 #9333EA);
+}}
+
+#aiGenerateButton:pressed {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #6D28D9, stop:1 #7E22CE);
+}}
 """

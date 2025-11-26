@@ -34,6 +34,7 @@ from components.multi_select import MultiSelectInput
 from utils.yaml_handler import YamlHandler
 from utils.preset_manager import PresetManager
 from utils.resource_path import get_images_dir
+from components.ai_dialog import AIGenerateDialog
 from styles import LIGHT_THEME
 
 
@@ -158,6 +159,13 @@ class PromptGeneratorApp(QMainWindow):
         refresh_btn.setToolTip("刷新预设列表")
         refresh_btn.clicked.connect(self._load_presets_to_selector)
         layout.addWidget(refresh_btn)
+
+        # AI生成按钮
+        ai_btn = QPushButton("AI 生成")
+        ai_btn.setObjectName("aiGenerateButton")
+        ai_btn.setToolTip("使用AI根据描述自动生成提示词")
+        ai_btn.clicked.connect(self._show_ai_generate_dialog)
+        layout.addWidget(ai_btn)
 
         layout.addStretch()
 
@@ -675,6 +683,19 @@ class PromptGeneratorApp(QMainWindow):
                 self._show_toast(f"已删除预设: {name}")
             else:
                 self._show_toast("删除预设失败")
+
+    # ========== AI 生成相关方法 ==========
+
+    def _show_ai_generate_dialog(self):
+        """显示AI生成对话框"""
+        dialog = AIGenerateDialog(self)
+        dialog.generated.connect(self._on_ai_generated)
+        dialog.exec()
+
+    def _on_ai_generated(self, data: dict):
+        """AI生成完成，填充到表单"""
+        self._fill_form_from_data(data)
+        self._show_toast("AI生成的提示词已填充到表单")
 
     # ========== 其他方法 ==========
 
