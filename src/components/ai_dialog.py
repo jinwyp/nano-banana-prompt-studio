@@ -558,6 +558,58 @@ class AIModifyDialog(QDialog):
         self.prompt_input.setFont(font)
         input_layout.addWidget(self.prompt_input)
         
+        # 添加快捷操作按钮
+        quick_ops_layout = QHBoxLayout()
+        quick_ops_layout.setSpacing(8)
+        
+        quick_ops_label = QLabel("快速指定修改内容：")
+        quick_ops_layout.addWidget(quick_ops_label)
+        
+        self.quick_ops_buttons = {}  # 存储按钮引用
+        
+        # 创建快捷操作按钮
+        quick_op_names = ["人物", "服饰", "动作", "地点", "镜头角度"]
+        for op_name in quick_op_names:
+            btn = QPushButton(op_name)
+            btn.setCheckable(True)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f0f0f0;
+                    border: 1px solid #ccc;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                QPushButton:checked {
+                    background-color: #2196F3;
+                    color: white;
+                    border: 1px solid #1976D2;
+                }
+            """)
+            btn.clicked.connect(lambda checked, name=op_name: self._on_quick_op_clicked(name))
+            quick_ops_layout.addWidget(btn)
+            self.quick_ops_buttons[op_name] = btn
+            
+        quick_ops_layout.addStretch()
+        input_layout.addLayout(quick_ops_layout)
+        
+        # 添加确认按钮
+        self.confirm_quick_ops_btn = QPushButton("确认选中")
+        self.confirm_quick_ops_btn.clicked.connect(self._confirm_quick_ops)
+        self.confirm_quick_ops_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        quick_ops_layout.addWidget(self.confirm_quick_ops_btn)
+        
         splitter.addWidget(input_container)
         
         # 输出区域（流式显示和对比显示）
@@ -879,3 +931,26 @@ class AIModifyDialog(QDialog):
         if self._is_generating:
             self.ai_service.cancel()
         self.reject()
+
+    def _on_quick_op_clicked(self, op_name: str):
+        """处理快捷操作按钮点击"""
+        # 按钮本身会自动切换选中状态，这里只需要处理逻辑
+        pass
+
+    def _confirm_quick_ops(self):
+        """确认选中的快捷操作并生成描述文本"""
+        selected_ops = [name for name, btn in self.quick_ops_buttons.items() if btn.isChecked()]
+        
+        if not selected_ops:
+            QMessageBox.warning(self, "提示", "请至少选择一个要修改的项目")
+            return
+            
+        # 生成描述文本
+        if len(selected_ops) == 1:
+            desc_text = f"修改{selected_ops[0]}，其它参数保持不变"
+        else:
+            ops_list = "、".join(selected_ops)
+            desc_text = f"修改{ops_list}参数，其它参数禁止修改"
+            
+        # 设置到输入框
+        self.prompt_input.setPlainText(desc_text)
