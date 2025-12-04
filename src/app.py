@@ -35,6 +35,7 @@ from utils.yaml_handler import YamlHandler
 from utils.preset_manager import PresetManager
 from utils.resource_path import get_images_dir
 from components.ai_dialog import AIGenerateDialog
+from components.ai_image_dialog import AIImageGenerateDialog
 from styles import LIGHT_THEME
 
 
@@ -160,19 +161,26 @@ class PromptGeneratorApp(QMainWindow):
         refresh_btn.clicked.connect(self._load_presets_to_selector)
         layout.addWidget(refresh_btn)
 
-        # AI生成按钮
-        ai_btn = QPushButton("AI 生成")
+        # AI提示词生成按钮
+        ai_btn = QPushButton("AI提示词生成")
         ai_btn.setObjectName("aiGenerateButton")
         ai_btn.setToolTip("使用AI根据描述自动生成提示词")
         ai_btn.clicked.connect(self._show_ai_generate_dialog)
         layout.addWidget(ai_btn)
 
         # 添加AI修改按钮
-        ai_modify_btn = QPushButton("AI 修改")
+        ai_modify_btn = QPushButton("AI提示词修改")
         ai_modify_btn.setObjectName("aiGenerateButton")  # 使用相同的对象名以保持样式一致
         ai_modify_btn.setToolTip("使用AI根据描述修改当前提示词")
         ai_modify_btn.clicked.connect(self._show_ai_modify_dialog)
         layout.addWidget(ai_modify_btn)
+
+        # AI 生图按钮
+        ai_image_btn = QPushButton("Banana图片生成")
+        ai_image_btn.setObjectName("aiGenerateButton")
+        ai_image_btn.setToolTip("使用 Gemini 根据提示词生成图片")
+        ai_image_btn.clicked.connect(self._show_ai_image_dialog)
+        layout.addWidget(ai_image_btn)
 
         layout.addStretch()
 
@@ -707,6 +715,13 @@ class PromptGeneratorApp(QMainWindow):
         current_data = self._collect_form_data()
         dialog = AIModifyDialog(current_data, self)
         dialog.modified.connect(self._on_ai_modified)
+        dialog.exec()
+
+    def _show_ai_image_dialog(self):
+        """显示AI 生图对话框"""
+        prompt_data = self._collect_form_data()
+        prompt_text = json.dumps(prompt_data, ensure_ascii=False, indent=2)
+        dialog = AIImageGenerateDialog(prompt_text, self)
         dialog.exec()
 
     def _on_ai_generated(self, data: dict):

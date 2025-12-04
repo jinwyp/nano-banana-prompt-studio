@@ -5,7 +5,7 @@
 <h1 align="center">Nano Banana 提示词生成器</h1>
 
 <p align="center">
-  <strong>结构化 AI 绘画提示词生成器</strong>
+  <strong>一站式AI图片生成工具，通过结构化提示词控制图片生成质量。</strong>
 </p>
 
 <p align="center">
@@ -21,12 +21,27 @@
 
 - **可视化编辑** - 表单化编辑提示词，方便针对特定元素进行修改。
 - **AI 智能生成** - 一句话描述生成完整结构化提示词
+- **AI 修改** - 一句话描述对已有提示词进行修改
 - **预设管理** - 保存/加载/删除常用提示词配置
 - **一键复制** - 快速复制 JSON 到剪贴板
+- **图片生成** - 通过gemini接口将提示词输入，直接生成图片
 
 ## 界面预览
 
+* 主界面
 ![UI Preview](./images/UI_1.png)
+----
+
+* AI生成提示词界面
+![UI Preview](./images/UI_2.png)
+----
+
+* AI修挂提示词界面
+![UI Preview](./images/UI_3.png)
+----
+
+* 图片生成界面
+![UI Preview](./images/UI_4.png)
 
 ## 快速开始
 
